@@ -68,7 +68,7 @@ app.use("/graphql", (req, res, next) => {
   context: { user: req.user }
 })));
 
-app.get("*", (req, res) => {
+app.get("(.*)", (req, res) => {
   if (!req.path.startsWith("/api") && !req.path.startsWith("/graphql")) {
     res.sendFile(path.join(pastaAdminBuild, "index.html"));
   }
