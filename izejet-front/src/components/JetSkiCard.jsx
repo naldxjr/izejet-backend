@@ -1,61 +1,92 @@
-import { MapPin, MoreVertical, Trash2 } from 'lucide-react';
+import { MapPin, MoreVertical, Trash2, Edit } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useState } from 'react';
 
-export default function JetSkiCard({ id, tag, titulo, local, preco, imagem, onDelete }) {
+export default function JetSkiCard({ id, tag, titulo, local, preco, imagem, onDelete, onEdit }) {
   const [menuAberto, setMenuAberto] = useState(false);
 
   const handleDelete = (e) => {
     e.preventDefault();
-    if (onDelete && window.confirm('Tem certeza que deseja excluir este jet ski?')) {
+    if (onDelete) {
       onDelete(id);
     }
     setMenuAberto(false);
   };
 
+  const handleEdit = (e) => {
+    e.preventDefault();
+    if (onEdit) {
+      onEdit();
+    }
+    setMenuAberto(false);
+  };
+
   return (
-    <div className="relative">
-    <Link to={`/jetski/${id}`} className="block bg-white rounded-3xl overflow-hidden shadow-sm mb-5 border border-gray-100 hover:shadow-md transition">
-      <div className="relative h-48">
-        <span className="absolute top-4 left-4 bg-white/90 backdrop-blur-sm text-[#0D253F] text-xs font-bold px-3 py-1.5 rounded-lg z-10">
-          {tag}
-        </span>
-        <img src={imagem} alt={titulo} className="w-full h-full object-cover" />
-      </div>
-      <div className="p-5">
-        <h3 className="text-lg font-bold text-gray-800 mb-1">{titulo}</h3>
-        <div className="flex items-center text-gray-500 text-sm mb-4">
-          <MapPin size={16} className="mr-1 text-[#3B96D2]" />
-          {local}
-        </div>
-        <div className="flex justify-between items-center mt-2 pt-4 border-t border-gray-100">
-          <span className="text-sm text-gray-500 font-medium">A partir de</span>
-          <span className="text-xl font-black text-[#3B96D2]">{preco}</span>
-        </div>
-      </div>
-    </Link>
-    {onDelete && (
-      <div className="absolute top-2 right-2">
-        <button
-          onClick={(e) => { e.preventDefault(); setMenuAberto(!menuAberto); }}
-          className="bg-white/90 backdrop-blur-sm p-2 rounded-lg hover:bg-white transition z-20"
-          title="Opções"
-        >
-          <MoreVertical size={18} className="text-gray-600" />
-        </button>
-        {menuAberto && (
-          <div className="absolute top-full right-0 mt-2 bg-white border border-gray-200 rounded-lg shadow-lg z-30">
-            <button
-              onClick={handleDelete}
-              className="flex items-center gap-2 text-red-600 hover:bg-red-50 w-full px-4 py-2 rounded-lg transition first:rounded-t-lg last:rounded-b-lg"
-            >
-              <Trash2 size={16} />
-              Excluir
-            </button>
+    <div className="relative group">
+      <Link to={`/jetski/${id}`} className="block bg-[#111827]/40 backdrop-blur-md rounded-xl overflow-hidden border border-gray-800/60 hover:border-gray-700/80 transition shadow-xl h-full flex flex-col justify-between">
+        <div>
+          <div className="relative h-44 w-full bg-[#0b0f19]">
+            <span className="absolute top-3 left-3 bg-[#111827]/90 border border-gray-800 text-cyan-400 text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md z-10 backdrop-blur-sm">
+              {tag}
+            </span>
+            <img 
+              src={imagem || "https://cdn.paytour.com.br/assets/images/passeios-2000295/adfba342517735e729a50e20eea7bd83/WhatsApp%20Image%202025-02-26%20at%2020.05.02_optimized.webp"} 
+              alt={titulo} 
+              className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" 
+            />
           </div>
-        )}
-      </div>
-    )}
+          <div className="p-4">
+            <h3 className="text-sm font-semibold text-white tracking-tight line-clamp-1 mb-1">{titulo}</h3>
+            <div className="flex items-center text-gray-400 text-xs">
+              <MapPin size={12} className="mr-1 text-cyan-400" />
+              <span className="truncate">{local || 'Hangar Principal'}</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="px-4 pb-4">
+          <div className="flex justify-between items-center pt-3 border-t border-gray-800/60">
+            <span className="text-[10px] text-gray-500 font-semibold uppercase tracking-wider">Avaliação Fração</span>
+            <span className="text-sm font-bold text-cyan-400">{preco}</span>
+          </div>
+        </div>
+      </Link>
+
+      {(onDelete || onEdit) && (
+        <div className="absolute top-3 right-3 z-30">
+          <button
+            onClick={(e) => { e.preventDefault(); setMenuAberto(!menuAberto); }}
+            className="bg-[#111827]/90 border border-gray-800 p-1.5 rounded-lg text-gray-400 hover:text-white backdrop-blur-sm transition shadow-md"
+            title="Opções Administrativas"
+          >
+            <MoreVertical size={14} />
+          </button>
+          
+          {menuAberto && (
+            <div className="absolute top-full right-0 mt-1 bg-[#111827] border border-gray-800 rounded-xl shadow-2xl z-40 w-32 overflow-hidden animate-fade-in">
+              {onEdit && (
+                <button
+                  onClick={handleEdit}
+                  className="flex items-center gap-2 text-gray-300 hover:bg-gray-800/60 w-full px-3 py-2.5 transition border-b border-gray-800 text-left text-xs font-medium"
+                >
+                  <Edit size={12} className="text-cyan-400" />
+                  <span>Editar Ativo</span>
+                </button>
+              )}
+
+              {onDelete && (
+                <button
+                  onClick={handleDelete}
+                  className="flex items-center gap-2 text-red-400 hover:bg-red-500/10 w-full px-3 py-2.5 transition text-left text-xs font-medium"
+                >
+                  <Trash2 size={12} />
+                  <span>Excluir Ativo</span>
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

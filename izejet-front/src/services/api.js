@@ -20,8 +20,11 @@ api.interceptors.response.use(
   },
   (error) => {
     if (error.response && error.response.status === 401) {
-      localStorage.clear();
-      window.location.href = '/login';
+      localStorage.removeItem('token');
+      localStorage.removeItem('usuarioId');
+      localStorage.removeItem('usuarioCpf');
+      localStorage.removeItem('usuarioEmail');
+      localStorage.removeItem('usuarioNome');
     }
     return Promise.reject(error);
   }

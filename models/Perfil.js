@@ -1,22 +1,11 @@
-const mongoose = require('mongoose');
+const mongoose = require("mongoose");
 
 const PerfilSchema = new mongoose.Schema({
   usuario: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'Usuario'
-  },
-  nome: {
-    type: String,
-    trim: true
-  },
-  email: {
-    type: String,
-    trim: true,
-    unique: true,
-    sparse: true
-  },
-  senha: {
-    type: String
+    ref: "Usuario",
+    required: true,
+    unique: true
   },
   cpf: {
     type: String,
@@ -25,25 +14,24 @@ const PerfilSchema = new mongoose.Schema({
     trim: true
   },
   telefone: {
-    type: String
+    type: String,
+    required: true,
+    trim: true
   },
   endereco: {
-    type: String
+    type: String,
+    required: true,
+    trim: true
   },
   licencaMotonauta: {
-    type: String
+    type: String,
+    required: true,
+    enum: ["Possui Arrais Amador", "Possui Motonauta", "Não possui"],
+    default: "Não possui"
   }
 }, {
   timestamps: true,
-  collection: 'perfils'
+  collection: "perfis"
 });
 
-PerfilSchema.index(
-  { usuario: 1 },
-  {
-    unique: true,
-    partialFilterExpression: { usuario: { $type: 'objectId' } }
-  }
-);
-
-module.exports = mongoose.model('Perfil', PerfilSchema);
+module.exports = mongoose.model("Perfil", PerfilSchema);

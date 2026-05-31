@@ -1,10 +1,19 @@
 const adminOnly = (req, res, next) => {
-  // O middleware 'auth' já deve ter colocado o usuário em req.user
-  if (req.user && req.user.cargo === 'admin') {
-    next(); // É admin, pode passar!
-  } else {
-    res.status(403).json({ msg: "Acesso negado. Apenas administradores podem realizar esta ação." });
+  const usuario = req.user;
+
+  if (!usuario) {
+    return res.status(401).json({ msg: "Acesso negado. Usuário não autenticado." });
   }
+
+  const cargoUser = usuario.cargo || usuario.role;
+
+  if (cargoUser && String(cargoUser).trim().toLowerCase() === "admin") {
+    return next();
+  }
+
+  res.status(403).json({ 
+    msg: "Acesso proibido. Esta área requer privilégios de administração náutica." 
+  });
 };
 
 module.exports = { adminOnly };

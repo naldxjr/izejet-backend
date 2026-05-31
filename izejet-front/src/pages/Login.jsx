@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Mail, Lock, LogIn } from 'lucide-react';
-import Header from '../components/Header';
+import { Mail, Lock, LogIn, Loader2 } from 'lucide-react';
 import api from '../services/api';
 
 export default function Login() {
   const [email, setEmail] = useState('');
   const [senha, setSenha] = useState('');
   const [erro, setErro] = useState('');
+  const [carregando, setCarregando] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -18,74 +18,89 @@ export default function Login() {
 
   const fazerLogin = async (e) => {
     e.preventDefault();
+    if (carregando) return;
+
     setErro('');
+    setCarregando(true);
     
     try {
       const resposta = await api.post('/usuarios/login', {
-        email,
+        email: String(email).toLowerCase().trim(),
         senha
       });
 
-      if (resposta.data.usuario.cargo !== 'admin') {
-        setErro('Acesso negado!');
+      const usuario = resposta.data.usuario;
+      const cargoUsuario = usuario?.cargo || usuario?.role;
+
+      if (cargoUsuario !== 'admin') {
+        setErro('Acesso negado. Apenas administradores autorizados.');
+        setCarregando(false);
         return; 
       }
 
       localStorage.setItem('token', resposta.data.token);
-      localStorage.setItem('usuarioId', resposta.data.usuario._id);
-      localStorage.setItem('usuarioEmail', resposta.data.usuario.email);
-      localStorage.setItem('usuarioCpf', resposta.data.usuario.cpf);
+      localStorage.setItem('usuarioId', usuario._id);
+      localStorage.setItem('usuarioEmail', usuario.email);
+      localStorage.setItem('usuarioCpf', usuario.cpf);
+      localStorage.setItem('usuarioNome', usuario.nome);
       
-      navigate('/');
+      navigate('/', { replace: true });
     } catch (error) {
       setErro(error.response?.data?.msg || 'Email ou senha inválidos.');
+      setCarregando(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-10">
-      <Header mostrarLogout={false} alto={true} />
-      <main className="max-w-md mx-auto px-4 mt-8">
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+    <div className="min-h-screen bg-[#090d16] flex flex-col justify-center items-center px-4 relative overflow-hidden">
+      <div className="absolute top-[-20%] left-[-10%] w-[500px] h-[500px] bg-cyan-500/5 rounded-full blur-[120px] pointer-events-none" />
+      <div className="absolute bottom-[-20%] right-[-10%] w-[500px] h-[500px] bg-blue-500/5 rounded-full blur-[120px] pointer-events-none" />
+
+      <main className="w-full max-w-md z-10">
+        <div className="bg-[#111827]/60 backdrop-blur-xl p-8 rounded-2xl border border-gray-800/60 shadow-2xl">
           <div className="text-center mb-8">
-            <h1 className="text-2xl font-black text-[#0D253F]">Bem-vindo de volta</h1>
-            <p className="text-sm text-gray-500 mt-1">Faça login para continuar</p>
+            <h1 className="text-2xl font-bold tracking-tight text-white">IzeJet Admin</h1>
+            <p className="text-sm text-gray-400 mt-2">Painel de Controle e Monitoramento Náutico</p>
           </div>
 
           {erro && (
-            <div className="bg-red-100 text-red-700 p-3 rounded-lg text-sm mb-4 text-center font-medium">
+            <div className="bg-red-500/10 border border-red-500/20 text-red-400 p-3 rounded-xl text-sm mb-6 text-center font-medium animate-pulse">
               {erro}
             </div>
           )}
 
-          <form onSubmit={fazerLogin} className="space-y-4">
+          <form onSubmit={fazerLogin} className="space-y-5">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+              <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">E-mail Corporativo</label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Mail size={18} className="text-gray-400" />
+                  <Mail size={16} className="text-gray-500" />
                 </div>
                 <input
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#3B96D2] focus:border-transparent outline-none"
+                  disabled={carregando}
+                  className="w-full pl-10 pr-4 py-2.5 bg-[#0b0f19] border border-gray-800 rounded-xl text-white placeholder-gray-600 focus:ring-1 focus:ring-cyan-500/50 focus:border-cyan-500 outline-none transition disabled:opacity-50 text-sm"
+                  placeholder="admin@izejet.com"
                   required
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Senha</label>
+              <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Chave de Segurança</label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Lock size={18} className="text-gray-400" />
+                  <Lock size={16} className="text-gray-500" />
                 </div>
                 <input
                   type="password"
                   value={senha}
                   onChange={(e) => setSenha(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#3B96D2] focus:border-transparent outline-none"
+                  disabled={carregando}
+                  className="w-full pl-10 pr-4 py-2.5 bg-[#0b0f19] border border-gray-800 rounded-xl text-white placeholder-gray-600 focus:ring-1 focus:ring-cyan-500/50 focus:border-cyan-500 outline-none transition disabled:opacity-50 text-sm"
+                  placeholder="••••••••"
                   required
                 />
               </div>
@@ -93,18 +108,22 @@ export default function Login() {
 
             <button
               type="submit"
-              className="w-full bg-[#3B96D2] hover:bg-blue-500 text-white font-bold py-3 rounded-xl transition flex justify-center items-center gap-2 mt-6"
+              disabled={carregando}
+              className="w-full h-11 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-semibold rounded-xl transition flex justify-center items-center gap-2 mt-8 shadow-lg shadow-cyan-500/10 hover:shadow-cyan-500/20 disabled:opacity-50 disabled:pointer-events-none text-sm"
             >
-              <LogIn size={20} />
-              Entrar
+              {carregando ? (
+                <Loader2 size={18} className="animate-spin text-white" />
+              ) : (
+                <>
+                  <LogIn size={18} />
+                  Acessar Console
+                </>
+              )}
             </button>
           </form>
 
-          <div className="mt-6 text-center text-sm text-gray-600">
-            Não tem uma conta?{' '}
-            <Link to="/cadastro" className="text-[#3B96D2] font-bold hover:underline">
-              Cadastre-se
-            </Link>
+          <div className="mt-8 pt-6 border-t border-gray-800/50 text-center text-xs text-gray-500">
+            Painel interno restrito. IP monitorado por segurança.
           </div>
         </div>
       </main>

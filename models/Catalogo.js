@@ -18,18 +18,25 @@ const CatalogoSchema = new mongoose.Schema({
   },
   imagem: {
     type: String,
+    required: true,
     trim: true
   },
   local: {
     type: String,
-    trim: true
+    trim: true,
+    default: "Hangar Principal"
   },
   tag: {
     type: String,
-    trim: true
+    trim: true,
+    default: "Cota"
   }
 }, { 
-  timestamps: true 
+  timestamps: true,
+  collection: "catalogos"
 });
+
+CatalogoSchema.index({ produto: 1 });
+CatalogoSchema.index({ preco: 1 });
 
 module.exports = mongoose.model("Catalogo", CatalogoSchema);

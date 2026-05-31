@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Ship, AlertCircle } from 'lucide-react';
+import { Search, Ship, AlertCircle, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Header from '../components/Header';
 import JetSkiCard from '../components/JetSkiCard';
@@ -18,8 +18,8 @@ export default function Catalogo() {
       try {
         const resposta = await api.get('/catalogo');
         setCatalogo(resposta.data);
-      } catch {
-        setErro('Não foi possível carregar o catálogo de jetskis.');
+      } catch (error) {
+        setErro('Não foi possível carregar o catálogo de ativos náuticos.');
       } finally {
         setCarregando(false);
       }
@@ -32,79 +32,86 @@ export default function Catalogo() {
     try {
       await api.delete(`/catalogo/${id}`);
       setCatalogo(prev => prev.filter(item => item._id !== id));
-      toast.success('Jet ski excluído com sucesso!');
+      toast.success('Ativo removido do inventário com sucesso!');
     } catch (error) {
-      toast.error(error.response?.data?.msg || 'Erro ao excluir jet ski.');
+      toast.error(error.response?.data?.msg || 'Erro na exclusão do item.');
     }
   };
 
-  const catalogoFiltrado = catalogo.filter((item) => {
-    const termo = busca.toLowerCase();
-    return (
-      (item.produto || '').toLowerCase().includes(termo) ||
-      (item.descricao || '').toLowerCase().includes(termo) ||
-      (item.local || '').toLowerCase().includes(termo) ||
-      (item.tag || '').toLowerCase().includes(termo)
-    );
-  });
+  const catalogoFiltrado = useMemo(() => {
+    return catalogo.filter((item) => {
+      if (!busca) return true;
+      const termo = busca.toLowerCase().trim();
+      return (
+        String(item.produto || '').toLowerCase().includes(termo) ||
+        String(item.descricao || '').toLowerCase().includes(termo) ||
+        String(item.local || '').toLowerCase().includes(termo) ||
+        String(item.tag || '').toLowerCase().includes(termo)
+      );
+    });
+  }, [catalogo, busca]);
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col">
+    <div className="w-full min-h-screen bg-[#090d16] text-white overflow-x-hidden flex flex-col">
       <Header mostrarVoltar={true} onVoltar={() => navigate('/')} />
 
-      <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6 sm:px-6 lg:px-8">
-        <section className="mt-4 rounded-[2rem] border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+      <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-8 sm:px-6 lg:px-8">
+        <section className="bg-[#111827]/40 backdrop-blur-md border border-gray-800/60 p-6 rounded-xl shadow-xl">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-8">
             <div>
-              <h1 className="text-2xl font-black text-slate-900 sm:text-3xl">Ver Catálogo de Jetskis</h1>
-              <p className="mt-1 text-sm text-slate-500">Itens disponíveis da coleção catalogos.</p>
+              <h1 className="text-xl font-bold tracking-tight">Controle de Ativos e Frota</h1>
+              <p className="text-xs text-gray-400 mt-0.5">Gerenciamento de embarcações e cotas integradas.</p>
             </div>
-            <div className="rounded-2xl bg-[#3B96D2]/10 p-3 text-[#3B96D2]">
-              <Ship size={22} />
+            <div className="p-2.5 rounded-lg bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 self-start sm:self-auto">
+              <Ship size={18} />
             </div>
           </div>
 
-          <div className="mt-6 relative">
-            <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4">
-              <Search size={18} className="text-slate-400" />
+          <div className="relative w-full mb-6">
+            <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+              <Search size={14} className="text-gray-500" />
             </div>
             <input
               type="text"
               value={busca}
               onChange={(e) => setBusca(e.target.value)}
-              className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-3.5 pl-11 pr-4 text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-[#3B96D2] focus:bg-white focus:ring-4 focus:ring-[#3B96D2]/10"
-              placeholder="Pesquisar jetskis..."
+              className="w-full rounded-xl border border-gray-800 bg-[#0b0f19] py-2.5 pl-9 pr-4 text-xs text-white placeholder-gray-500 outline-none transition focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/20"
+              placeholder="Buscar por modelo, especificações ou hangar..."
             />
           </div>
 
           {erro && (
-            <div className="mt-4 flex items-center gap-2 rounded-2xl bg-red-100 p-3 text-sm font-medium text-red-700">
-              <AlertCircle size={18} />
+            <div className="mb-6 flex items-center gap-2 rounded-xl border border-red-500/10 bg-red-500/5 px-4 py-2.5 text-xs text-red-400 font-medium">
+              <AlertCircle size={14} />
               {erro}
             </div>
           )}
 
           {carregando ? (
-            <div className="flex items-center justify-center py-16 text-sm text-slate-500">Carregando catálogo...</div>
+            <div className="flex flex-col items-center justify-center py-20 gap-3">
+              <Loader2 size={24} className="animate-spin text-cyan-500" />
+              <span className="text-xs text-gray-500">Sincronizando hangar...</span>
+            </div>
           ) : catalogoFiltrado.length > 0 ? (
-            <div className="mt-6 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+            <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
               {catalogoFiltrado.map((jet) => (
                 <JetSkiCard
                   key={jet._id}
                   id={jet._id}
                   tag={jet.tag || 'Disponível'}
                   titulo={jet.produto}
-                  local={jet.local || 'A combinar'}
-                  preco={`R$ ${Number(jet.preco).toFixed(2)}`}
-                  imagem={jet.imagem || 'https://cdn.paytour.com.br/assets/images/passeios-2000295/adfba342517735e729a50e20eea7bd83/WhatsApp%20Image%202025-02-26%20at%2020.05.02_optimized.webp'}
+                  local={jet.local || 'Hangar Principal'}
+                  preco={`R$ ${Number(jet.preco).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
+                  imagem={jet.imagem}
                   onDelete={handleDeleteJetski}
+                  onEdit={() => navigate(`/editar-jetski/${jet._id}`)}
                 />
               ))}
             </div>
           ) : (
-            <div className="mt-6 rounded-3xl border border-dashed border-slate-300 bg-slate-50 py-14 text-center">
-              <Search size={32} className="mx-auto mb-3 text-slate-300" />
-              <p className="font-medium text-slate-700">Nenhum jetski encontrado.</p>
+            <div className="rounded-xl border border-dashed border-gray-800 bg-[#0b0f19]/20 py-16 text-center flex flex-col items-center justify-center">
+              <Search size={24} className="mx-auto mb-2 text-gray-600" />
+              <p className="text-xs text-gray-400">Nenhum ativo náutico corresponde aos filtros aplicados.</p>
             </div>
           )}
         </section>

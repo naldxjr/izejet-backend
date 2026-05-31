@@ -4,120 +4,170 @@ const Reserva = require("../models/Reserva");
 const Perfil = require("../models/Perfil");
 const auth = require("../middleware/auth");
 
+const criarDataSemFuso = (dataString) => {
+  const partes = String(dataString).split("T")[0].split("-");
+  if (partes.length !== 3) return new Date(dataString);
+  return new Date(Number(partes[0]), Number(partes[1]) - 1, Number(partes[2]), 12, 0, 0, 0);
+};
+
 router.post("/", auth, async (req, res) => {
-    try {
-        const { cpf, produto, data } = req.body;
+  try {
+    const { cpf, produto, data } = req.body;
 
-        if (!cpf || !produto) {
-            return res.status(400).json({ msg: "Por favor, preencha todos os campos obrigatórios." });
-        }
-
-        const cpfNormalizado = String(cpf).replace(/\D/g, "");
-
-        if (!cpfNormalizado) {
-            return res.status(400).json({ msg: "Por favor, informe um CPF válido." });
-        }
-
-        const perfis = await Perfil.find().select("_id cpf");
-        const perfilEncontrado = perfis.find((perfil) => String(perfil.cpf).replace(/\D/g, "") === cpfNormalizado);
-
-        if (!perfilEncontrado) {
-            return res.status(404).json({ msg: "Nenhum perfil de cliente encontrado com esse CPF." });
-        }
-
-        if (data) {
-            const dataReserva = new Date(data);
-            const inicioDodia = new Date(dataReserva.getFullYear(), dataReserva.getMonth(), dataReserva.getDate(), 0, 0, 0);
-            const fimDoDia = new Date(dataReserva.getFullYear(), dataReserva.getMonth(), dataReserva.getDate(), 23, 59, 59);
-
-            const reservaExistente = await Reserva.findOne({
-                produto,
-                data: {
-                    $gte: inicioDodia,
-                    $lte: fimDoDia
-                }
-            });
-
-            if (reservaExistente) {
-                return res.status(409).json({ msg: "Este jet ski já está reservado para esta data. Escolha outra data." });
-            }
-        }
-
-        const reserva = new Reserva({
-            perfil: perfilEncontrado._id,
-            cpf: perfilEncontrado.cpf,
-            produto,
-            data 
-        });
-
-        await reserva.save();
-        res.status(201).json(reserva);
-    } catch (err) {
-        res.status(500).json({ msg: "Erro no servidor ao criar reserva." });
+    if (!cpf || !produto || !data) {
+      return res.status(400).json({ msg: "Por favor, preencha todos os campos obrigatórios." });
     }
+
+    const cpfNormalizado = String(cpf).replace(/\D/g, "");
+    if (!cpfNormalizado) {
+      return res.status(400).json({ msg: "Por favor, informe um CPF válido." });
+    }
+
+    const filtroPerfil = req.user.cargo === "admin" 
+      ? { cpf: { $regex: new RegExp(cpfNormalizado, "i") } }
+      : { usuario: req.user.id, cpf: { $regex: new RegExp(cpfNormalizado, "i") } };
+
+    const perfilEncontrado = await Perfil.findOne(filtroPerfil).select("_id cpf usuario");
+
+    if (!perfilEncontrado) {
+      return res.status(404).json({ msg: "Perfil de cliente não correspondente ou não encontrado." });
+    }
+
+    const dataReserva = criarDataSemFuso(data);
+    if (isNaN(dataReserva.getTime())) {
+      return res.status(400).json({ msg: "Formato de data inválido." });
+    }
+
+    const inicioDia = new Date(dataReserva.getFullYear(), dataReserva.getMonth(), dataReserva.getDate(), 0, 0, 0, 0);
+    const fimDoDia = new Date(dataReserva.getFullYear(), dataReserva.getMonth(), dataReserva.getDate(), 23, 59, 59, 999);
+
+    const reservaExistente = await Reserva.findOne({
+      produto,
+      status: { $ne: "rejeitada" },
+      data: {
+        $gte: inicioDia,
+        $lte: fimDoDia
+      }
+    });
+
+    if (reservaExistente) {
+      return res.status(409).json({ msg: "Este jet ski já está reservado para esta data. Escolha outra data." });
+    }
+
+    const reserva = new Reserva({
+      perfil: perfilEncontrado._id,
+      usuario: perfilEncontrado.usuario || req.user.id,
+      cpf: perfilEncontrado.cpf,
+      produto,
+      data: dataReserva,
+      status: "pendente"
+    });
+
+    await reserva.save();
+    res.status(201).json(reserva);
+  } catch (err) {
+    res.status(500).json({ msg: "Erro no servidor ao criar reserva." });
+  }
 });
 
 router.get("/", auth, async (req, res) => {
-    try {
-        const reservas = await Reserva.find()
-            .populate("perfil")
-            .populate("usuario", "-senha")
-            .populate("produto");
+  try {
+    const query = req.user.cargo === "admin" ? {} : { usuario: req.user.id };
+    
+    const reservas = await Reserva.find(query)
+      .populate("perfil", "telefone endereco licencaMotonauta")
+      .populate("usuario", "nome email")
+      .populate("produto");
 
-        res.json(reservas);
-    } catch (err) {
-        res.status(500).json({ msg: "Erro no servidor ao buscar reservas." });
-    }
+    res.json(reservas);
+  } catch (err) {
+    res.status(500).json({ msg: "Erro no servidor ao buscar reservas." });
+  }
 });
 
 router.put("/:id", auth, async (req, res) => {
-    try {
-        const { cpf, produto } = req.body;
-        let reserva = await Reserva.findById(req.params.id);
-
-        if (!reserva) {
-            return res.status(404).json({ msg: "Reserva não encontrada." });
-        }
-
-        reserva.cpf = cpf || reserva.cpf;
-        reserva.produto = produto || reserva.produto;
-
-        await reserva.save();
-        res.json(reserva);
-    } catch (err) {
-        res.status(500).json({ msg: "Erro no servidor ao atualizar reserva." });
+  try {
+    const { produto, data } = req.body;
+    
+    const query = req.user.cargo === "admin" ? { _id: req.params.id } : { _id: req.params.id, usuario: req.user.id };
+    const reserva = await Reserva.findOne(query);
+    
+    if (!reserva) {
+      return res.status(404).json({ msg: "Reserva não encontrada ou acesso negado." });
     }
+
+    if (reserva.status === "aprovada" && req.user.cargo !== "admin") {
+      return res.status(400).json({ msg: "Não é possível alterar uma reserva já confirmada." });
+    }
+
+    if (data) {
+      const dataReserva = criarDataSemFuso(data);
+      if (isNaN(dataReserva.getTime())) {
+        return res.status(400).json({ msg: "Formato de data inválido." });
+      }
+
+      const inicioDia = new Date(dataReserva.getFullYear(), dataReserva.getMonth(), dataReserva.getDate(), 0, 0, 0, 0);
+      const fimDoDia = new Date(dataReserva.getFullYear(), dataReserva.getMonth(), dataReserva.getDate(), 23, 59, 59, 999);
+
+      const conflito = await Reserva.findOne({
+        _id: { $ne: req.params.id },
+        produto: produto || reserva.produto,
+        status: { $ne: "rejeitada" },
+        data: { $gte: inicioDia, $lte: fimDoDia }
+      });
+
+      if (conflito) {
+        return res.status(409).json({ msg: "O ativo já possui um agendamento confirmado para esta data." });
+      }
+      reserva.data = dataReserva;
+    }
+
+    reserva.produto = produto || reserva.produto;
+    await reserva.save();
+    res.json(reserva);
+  } catch (err) {
+    res.status(500).json({ msg: "Erro no servidor ao atualizar reserva." });
+  }
 });
 
-router.put('/:id/status', auth, async (req, res) => {
+router.put("/:id/status", auth, async (req, res) => {
   try {
+    if (req.user.cargo !== "admin") {
+      return res.status(403).json({ msg: "Acesso negado. Apenas administradores podem alterar o status." });
+    }
+
     const { status } = req.body;
+    if (!["pendente", "aprovada", "rejeitada"].includes(status)) {
+      return res.status(400).json({ msg: "Status operacional inválido." });
+    }
+
     const reserva = await Reserva.findByIdAndUpdate(
       req.params.id, 
       { status }, 
       { new: true }
     );
     
-    if (!reserva) return res.status(404).json({ msg: 'Reserva não encontrada' });
+    if (!reserva) return res.status(404).json({ msg: "Reserva não encontrada." });
     res.json(reserva);
   } catch (err) {
-    res.status(500).json({ msg: 'Erro ao atualizar status da reserva' });
+    res.status(500).json({ msg: "Erro ao atualizar status da reserva." });
   }
 });
 
 router.delete("/:id", auth, async (req, res) => {
-    try {
-        const reserva = await Reserva.findById(req.params.id);
-
-        if (!reserva) {
-            return res.status(404).json({ msg: "Reserva não encontrada." });
-        }
-
-        await reserva.deleteOne();
-        res.json({ msg: "Reserva cancelada com sucesso." });
-    } catch (err) {
-        res.status(500).json({ msg: "Erro no servidor ao cancelar reserva." });
+  try {
+    const query = req.user.cargo === "admin" ? { _id: req.params.id } : { _id: req.params.id, usuario: req.user.id };
+    
+    const reserva = await Reserva.findOne(query);
+    if (!reserva) {
+      return res.status(404).json({ msg: "Reserva não encontrada ou acesso negado." });
     }
+
+    await reserva.deleteOne();
+    res.json({ msg: "Reserva cancelada com sucesso." });
+  } catch (err) {
+    res.status(500).json({ msg: "Erro no servidor ao cancelar reserva." });
+  }
 });
 
 module.exports = router;

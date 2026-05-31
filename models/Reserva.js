@@ -3,13 +3,11 @@ const mongoose = require("mongoose");
 const ReservaSchema = new mongoose.Schema({
   usuario: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: "Usuario",
-    required: false
+    ref: "Usuario"
   },
   perfil: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: "Perfil",
-    required: false
+    ref: "Perfil"
   },
   cpf: {
     type: String,
@@ -23,18 +21,20 @@ const ReservaSchema = new mongoose.Schema({
   },
   data: {
     type: Date,
-    required: false
-  },
-  dataCriacao: {
-    type: Date,
-    default: Date.now
+    required: true
   },
   status: { 
     type: String, 
-    enum: ['pendente', 'aprovada', 'rejeitada'], 
-    default: 'pendente' },
+    enum: ["pendente", "aprovada", "rejeitada"], 
+    default: "pendente" 
+  }
 }, {
-  timestamps: true
+  timestamps: true,
+  collection: "reservas"
 });
+
+ReservaSchema.index({ produto: 1, data: 1, status: 1 });
+ReservaSchema.index({ usuario: 1 });
+ReservaSchema.index({ cpf: 1 });
 
 module.exports = mongoose.model("Reserva", ReservaSchema);
