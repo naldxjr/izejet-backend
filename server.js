@@ -4,6 +4,7 @@ const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
 const jwt = require("jsonwebtoken");
+const path = require("path");
 const { graphqlHTTP } = require("express-graphql");
 
 const schema = require("./graphql/schema");
@@ -47,6 +48,9 @@ app.use("/api/catalogo", catalogo);
 app.use("/api/reservas", reservas);
 app.use("/api/perfil", require("./routes/perfil"));
 
+const pastaAdminBuild = path.join(__dirname, "admin/dist");
+app.use(express.static(pastaAdminBuild));
+
 app.use("/graphql", (req, res, next) => {
   const authHeader = req.header("Authorization");
   if (authHeader && authHeader.startsWith("Bearer ") && process.env.JWT_SECRET) {
@@ -63,6 +67,12 @@ app.use("/graphql", (req, res, next) => {
   graphiql: !isProduction,
   context: { user: req.user }
 })));
+
+app.get("*", (req, res) => {
+  if (!req.path.startsWith("/api") && !req.path.startsWith("/graphql")) {
+    res.sendFile(path.join(pastaAdminBuild, "index.html"));
+  }
+});
 
 app.use((err, req, res, next) => {
   res.status(500).json({
