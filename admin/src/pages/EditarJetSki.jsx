@@ -171,7 +171,7 @@ export default function EditarJetSki() {
                     <div className="flex flex-col items-center justify-center p-4 text-center text-gray-400">
                       <Upload size={20} className="mb-2 text-gray-600" />
                       <p className="text-xs font-semibold text-gray-300">
-                        {imagemNew ? imagemNova.name : 'Clique para selecionar novo arquivo'}
+                        {imagemNova ? imagemNova.name : 'Clique para selecionar novo arquivo'}
                       </p>
                     </div>
                     <input 
