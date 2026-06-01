@@ -65,11 +65,17 @@ router.post("/", auth, async (req, res) => {
 
     await reserva.save();
 
-    // 🔥 Dispara evento no WebSocket de Nova Reserva
-    const io = req.app.get("io");
-    if (io) io.emit("novaReserva", reserva);
+    // 🔥 Busca a reserva recém-criada preenchendo (populating) os dados do usuário e do Jet Ski
+    const reservaPopulada = await Reserva.findById(reserva._id)
+      .populate("perfil", "nome telefone endereco licencaMotonauta")
+      .populate("usuario", "nome email cpf")
+      .populate("produto");
 
-    res.status(201).json(reserva);
+    // 🔥 Dispara evento no WebSocket com a reserva COMPLETA (com nomes em vez de IDs)
+    const io = req.app.get("io");
+    if (io) io.emit("novaReserva", reservaPopulada);
+
+    res.status(201).json(reservaPopulada);
   } catch (err) {
     res.status(500).json({ msg: "Erro no servidor ao criar reserva." });
   }
@@ -79,9 +85,10 @@ router.get("/", auth, async (req, res) => {
   try {
     const query = req.user.cargo === "admin" ? {} : { usuario: req.user.id };
     
+    // 🔥 Adicionado "nome" e "cpf" nos populates para garantir a exibição correta
     const reservas = await Reserva.find(query)
-      .populate("perfil", "telefone endereco licencaMotonauta")
-      .populate("usuario", "nome email")
+      .populate("perfil", "nome telefone endereco licencaMotonauta")
+      .populate("usuario", "nome email cpf")
       .populate("produto");
 
     res.json(reservas);
@@ -130,10 +137,16 @@ router.put("/:id", auth, async (req, res) => {
     reserva.produto = produto || reserva.produto;
     await reserva.save();
 
-    const io = req.app.get("io");
-    if (io) io.emit("reservaAtualizada", reserva);
+    // 🔥 Popula antes de emitir a atualização
+    const reservaPopulada = await Reserva.findById(reserva._id)
+      .populate("perfil", "nome telefone endereco licencaMotonauta")
+      .populate("usuario", "nome email cpf")
+      .populate("produto");
 
-    res.json(reserva);
+    const io = req.app.get("io");
+    if (io) io.emit("reservaAtualizada", reservaPopulada);
+
+    res.json(reservaPopulada);
   } catch (err) {
     res.status(500).json({ msg: "Erro no servidor ao atualizar reserva." });
   }
@@ -150,11 +163,15 @@ router.put("/:id/status", auth, async (req, res) => {
       return res.status(400).json({ msg: "Status operacional inválido." });
     }
 
+    // 🔥 Adicionado encadeamento de populate direto no findByIdAndUpdate
     const reserva = await Reserva.findByIdAndUpdate(
       req.params.id, 
       { status }, 
       { new: true }
-    );
+    )
+      .populate("perfil", "nome telefone endereco licencaMotonauta")
+      .populate("usuario", "nome email cpf")
+      .populate("produto");
     
     if (!reserva) return res.status(404).json({ msg: "Reserva não encontrada." });
 
