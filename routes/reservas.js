@@ -64,6 +64,11 @@ router.post("/", auth, async (req, res) => {
     });
 
     await reserva.save();
+
+    // 🔥 Dispara evento no WebSocket de Nova Reserva
+    const io = req.app.get("io");
+    if (io) io.emit("novaReserva", reserva);
+
     res.status(201).json(reserva);
   } catch (err) {
     res.status(500).json({ msg: "Erro no servidor ao criar reserva." });
@@ -124,6 +129,10 @@ router.put("/:id", auth, async (req, res) => {
 
     reserva.produto = produto || reserva.produto;
     await reserva.save();
+
+    const io = req.app.get("io");
+    if (io) io.emit("reservaAtualizada", reserva);
+
     res.json(reserva);
   } catch (err) {
     res.status(500).json({ msg: "Erro no servidor ao atualizar reserva." });
@@ -148,6 +157,10 @@ router.put("/:id/status", auth, async (req, res) => {
     );
     
     if (!reserva) return res.status(404).json({ msg: "Reserva não encontrada." });
+
+    const io = req.app.get("io");
+    if (io) io.emit("reservaAtualizada", reserva);
+
     res.json(reserva);
   } catch (err) {
     res.status(500).json({ msg: "Erro ao atualizar status da reserva." });
@@ -163,7 +176,12 @@ router.delete("/:id", auth, async (req, res) => {
       return res.status(404).json({ msg: "Reserva não encontrada ou acesso negado." });
     }
 
+    const idRemovido = reserva._id;
     await reserva.deleteOne();
+
+    const io = req.app.get("io");
+    if (io) io.emit("reservaRemovida", idRemovido);
+
     res.json({ msg: "Reserva cancelada com sucesso." });
   } catch (err) {
     res.status(500).json({ msg: "Erro no servidor ao cancelar reserva." });

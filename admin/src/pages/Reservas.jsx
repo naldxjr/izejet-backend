@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { CalendarDays, Trash2, AlertCircle, Search, CheckCircle, XCircle, Clock, X, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { io } from 'socket.io-client';
 import Header from '../components/Header';
 import api from '../services/api';
 
@@ -36,6 +37,35 @@ export default function Reservas() {
       setBusca(location.state.buscarPor);
     }
   }, [location]);
+
+  // Conexão e Escuta do WebSocket no Painel Admin
+  useEffect(() => {
+    const socket = io("https://izejet-backend-api.onrender.com");
+
+    socket.on("novaReserva", (novaReserva) => {
+      setReservas((prev) => [novaReserva, ...prev]);
+      toast.success("Nova solicitação de reserva recebida!");
+    });
+
+    socket.on("reservaAtualizada", (reservaModificada) => {
+      setReservas((prev) =>
+        prev.map((r) => 
+          r._id === reservaModificada._id 
+            ? { ...r, status: reservaModificada.status, data: reservaModificada.data } 
+            : r
+        )
+      );
+    });
+
+    socket.on("reservaRemovida", (idRemovido) => {
+      setReservas((prev) => prev.filter((r) => r._id !== idRemovido));
+      toast.error("Um cliente cancelou uma reserva.");
+    });
+
+    return () => {
+      socket.disconnect();
+    };
+  }, []);
 
   const reservasFiltradas = useMemo(() => {
     return reservas.filter((reserva) => {

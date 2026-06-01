@@ -6,6 +6,8 @@ const cors = require("cors");
 const jwt = require("jsonwebtoken");
 const path = require("path");
 const { graphqlHTTP } = require("express-graphql");
+const http = require("http");
+const { Server } = require("socket.io");
 
 const schema = require("./graphql/schema");
 const Perfil = require("./models/Perfil");
@@ -14,6 +16,27 @@ const catalogo = require("./routes/catalogo");
 const reservas = require("./routes/reservas");
 
 const app = express();
+const httpServer = http.createServer(app);
+
+const corsOptions = {
+  origin: process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(",") : "*",
+  methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
+  allowedHeaders: ["Content-Type", "Authorization"]
+};
+
+const io = new Server(httpServer, {
+  cors: corsOptions
+});
+
+app.set("io", io);
+
+io.on("connection", (socket) => {
+  console.log(`[WebSocket] Novo cliente conectado: ${socket.id}`);
+  
+  socket.on("disconnect", () => {
+    console.log(`[WebSocket] Cliente desconectado: ${socket.id}`);
+  });
+});
 
 const isProduction = process.env.NODE_ENV === "production";
 const mongoUri = process.env.MONGO_URI;
@@ -33,12 +56,6 @@ mongoose.connect(mongoUri, mongoOptions)
   .catch(err => {
     console.error("[IzeJet API] Erro critico ao conectar no MongoDB:", err.message);
   });
-
-const corsOptions = {
-  origin: process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(",") : "*",
-  methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
-  allowedHeaders: ["Content-Type", "Authorization"]
-};
 
 app.use(cors(corsOptions));
 app.use(express.json({ limit: "10kb" }));
@@ -83,7 +100,7 @@ app.use((err, req, res, next) => {
 
 const PORT = process.env.PORT || 5000;
 
-const server = app.listen(PORT, () => {
+const server = httpServer.listen(PORT, () => {
   console.log(`[IzeJet API] Servidor operacional na porta ${PORT}`);
   console.log(`[IzeJet API] Ambiente ativo: ${isProduction ? "Producao" : "Desenvolvimento"}`);
 });
