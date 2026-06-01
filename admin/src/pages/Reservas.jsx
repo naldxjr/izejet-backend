@@ -174,19 +174,27 @@ export default function Reservas() {
                   ? new Date(reserva.data).toLocaleDateString('pt-BR')
                   : 'Pendente de confirmação';
 
+                // 🔥 Fallbacks inteligentes para nomear as reservas
+                const nomeAtivo = reserva.produto?.produto || 'Ativo Hidro-Náutico';
+                const nomeCapitao = reserva.usuario?.nome || reserva.perfil?.nome || 'Capitão não identificado';
+                const contatoCapitao = reserva.usuario?.email || reserva.cpf || 'Contato não disponível';
+
                 return (
                   <div key={reserva._id} className="flex flex-col rounded-xl border border-gray-800/60 bg-[#0b0f19]/40 p-5 hover:border-gray-700/60 transition shadow-xl">
                     <div className="mb-4 flex items-start justify-between gap-4">
                       <div>
                         <div className="flex flex-wrap items-center gap-3 mb-2">
                           <h3 className="text-sm font-semibold text-white tracking-tight">
-                            {reserva.produto?.produto || 'Ativo Hidro-Náutico'}
+                            {nomeAtivo}
                           </h3>
                           {renderBadgeStatus(reserva.status)}
                         </div>
-                        <p className="text-xs text-gray-400 truncate max-w-[250px] sm:max-w-md">
-                          <span className="text-gray-500">Capitão:</span> {reserva.usuario?.nome || reserva.usuario?.email || reserva.cpf}
-                        </p>
+                        
+                        {/* 🔥 Identificação visual do capitão muito mais limpa */}
+                        <div className="text-xs text-gray-400 max-w-[250px] sm:max-w-md space-y-0.5 mt-1">
+                          <p className="font-bold text-gray-300">{nomeCapitao}</p>
+                          <p className="text-[10px] text-gray-500 uppercase tracking-wider">{contatoCapitao}</p>
+                        </div>
                       </div>
 
                       <button
@@ -202,7 +210,7 @@ export default function Reservas() {
                       <div className="flex items-center gap-2">
                         <CalendarDays size={14} className="text-cyan-400" />
                         <span className="text-gray-500 font-medium">Data solicitada:</span>
-                        <span>{dataFormatada}</span>
+                        <span className="font-mono font-bold text-white">{dataFormatada}</span>
                       </div>
                     </div>
 
