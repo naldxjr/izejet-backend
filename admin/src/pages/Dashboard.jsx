@@ -1,14 +1,14 @@
-import { useState, useEffect, useMemo } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useState, useEffect, useMemo } from "react";
+import { useNavigate, Link } from "react-router-dom";
 import {
   Users, X, Anchor, CalendarCheck, Clock, TrendingUp,
   Search, CalendarDays, LayoutGrid, Ship, PlusCircle, ShieldCheck
-} from 'lucide-react';
-import api from '../services/api';
+} from "lucide-react";
+import api from "../services/api";
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const token = localStorage.getItem('token');
+  const token = localStorage.getItem("token");
 
   const [metricas, setMetricas] = useState({
     totalClientes: 0,
@@ -18,20 +18,20 @@ export default function Dashboard() {
   });
 
   const [reservas, setReservas] = useState([]);
-  const [busca, setBusca] = useState('');
+  const [busca, setBusca] = useState("");
   const [carregando, setCarregando] = useState(true);
-  const [erro, setErro] = useState('');
+  const [erro, setErro] = useState("");
 
   useEffect(() => {
     const buscarDados = async () => {
       setCarregando(true);
-      setErro('');
+      setErro("");
 
       try {
         const resultados = await Promise.allSettled([
-          api.get('/usuarios/todos'),
-          api.get('/catalogo'),
-          api.get('/reservas')
+          api.get("/usuarios/todos"),
+          api.get("/catalogo"),
+          api.get("/reservas")
         ]);
 
         let totalClientes = 0;
@@ -40,27 +40,27 @@ export default function Dashboard() {
         let totalReservas = 0;
         let listaReservas = [];
 
-        if (resultados[0].status === 'fulfilled') {
-          totalClientes = resultados[0].value.data.filter(u => u.cargo !== 'admin').length;
+        if (resultados[0].status === "fulfilled" && resultados[0].value?.data && Array.isArray(resultados[0].value.data)) {
+          totalClientes = resultados[0].value.data.filter(u => u && u.cargo !== "admin").length;
         }
-        if (resultados[1].status === 'fulfilled') {
+        if (resultados[1].status === "fulfilled" && resultados[1].value?.data && Array.isArray(resultados[1].value.data)) {
           totalJetskis = resultados[1].value.data.length;
         }
-        if (resultados[2].status === 'fulfilled') {
+        if (resultados[2].status === "fulfilled" && resultados[2].value?.data && Array.isArray(resultados[2].value.data)) {
           const dadosReservas = resultados[2].value.data;
-          reservasPendentes = dadosReservas.filter(r => r.status === 'pendente').length;
+          reservasPendentes = dadosReservas.filter(r => r && r.status === "pendente").length;
           totalReservas = dadosReservas.length;
           listaReservas = dadosReservas;
         }
 
-        if (resultados.every(r => r.status === 'rejected')) {
-          setErro('Falha crítica ao obter dados da infraestrutura.');
+        if (resultados.every(r => r.status === "rejected")) {
+          setErro("Falha crítica ao obter dados da infraestrutura.");
         }
 
         setMetricas({ totalClientes, totalJetskis, reservasPendentes, totalReservas });
         setReservas(listaReservas);
       } catch (error) {
-        setErro('Erro interno ao processar painel operacional.');
+        setErro("Erro interno ao processar painel operacional.");
       } finally {
         setCarregando(false);
       }
@@ -70,32 +70,34 @@ export default function Dashboard() {
   }, []);
 
   const reservasFiltradas = useMemo(() => {
+    if (!Array.isArray(reservas)) return [];
     return reservas.filter((reserva) => {
+      if (!reserva) return false;
       if (!busca) return true;
 
       const termo = busca.toLowerCase().trim();
-      const nomeJetSki = String(reserva.produto?.produto || '').toLowerCase();
-      const emailCliente = String(reserva.usuario?.email || '').toLowerCase();
-      const nomeCliente = String(reserva.usuario?.nome || '').toLowerCase();
+      const nomeJetSki = String(reserva.produto?.produto || "").toLowerCase();
+      const emailCliente = String(reserva.usuario?.email || "").toLowerCase();
+      const nomeCliente = String(reserva.usuario?.nome || "").toLowerCase();
 
-      const cpfReservaLimpo = String(reserva.cpf || reserva.usuario?.cpf || '').replace(/\D/g, '');
-      const buscaCpfLimpo = termo.replace(/\D/g, '');
+      const cpfReservaLimpo = String(reserva.cpf || reserva.usuario?.cpf || "").replace(/\D/g, "");
+      const buscaCpfLimpo = termo.replace(/\D/g, "");
 
       return (
         nomeJetSki.includes(termo) ||
         emailCliente.includes(termo) ||
         nomeCliente.includes(termo) ||
         (buscaCpfLimpo && cpfReservaLimpo.includes(buscaCpfLimpo)) ||
-        String(reserva.status || 'pendente').toLowerCase().includes(termo)
+        String(reserva.status || "pendente").toLowerCase().includes(termo)
       );
     });
   }, [reservas, busca]);
 
   const cardsMetricas = [
-    { titulo: 'Clientes Ativos', valor: metricas.totalClientes, icone: <Users size={18} />, bgIcone: 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20', rota: '/perfis' },
-    { titulo: 'Frota Cadastrada', valor: metricas.totalJetskis, icone: <Anchor size={18} />, bgIcone: 'bg-blue-500/10 text-blue-400 border border-blue-500/20', rota: '/catalogo' },
-    { titulo: 'Agendamentos Pendentes', valor: metricas.reservasPendentes, icone: <Clock size={18} />, bgIcone: 'bg-amber-500/10 text-amber-400 border border-amber-500/20', rota: '/reservas' },
-    { titulo: 'Total de Saídas', valor: metricas.totalReservas, icone: <CalendarCheck size={18} />, bgIcone: 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20', rota: '/reservas' }
+    { titulo: "Clientes Ativos", valor: metricas.totalClientes, icone: <Users size={18} />, bgIcone: 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20', rota: '/perfis' },
+    { titulo: "Frota Cadastrada", valor: metricas.totalJetskis, icone: <Anchor size={18} />, bgIcone: 'bg-blue-500/10 text-blue-400 border border-blue-500/20', rota: '/catalogo' },
+    { titulo: "Agendamentos Pendentes", valor: metricas.reservasPendentes, icone: <Clock size={18} />, bgIcone: 'bg-amber-500/10 text-amber-400 border border-amber-500/20', rota: '/reservas' },
+    { titulo: "Total de Saídas", valor: metricas.totalReservas, icone: <CalendarCheck size={18} />, bgIcone: 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20', rota: '/reservas' }
   ];
 
   return (
@@ -180,7 +182,7 @@ export default function Dashboard() {
                 placeholder="Buscar cliente, CPF ou Jet Ski..."
               />
               {busca && (
-                <button onClick={() => setBusca('')} className="absolute inset-y-0 right-0 flex items-center pr-2.5 text-gray-500 hover:text-gray-300">
+                <button onClick={() => setBusca("")} className="absolute inset-y-0 right-0 flex items-center pr-2.5 text-gray-500 hover:text-gray-300">
                   <X size={14} />
                 </button>
               )}
@@ -195,34 +197,37 @@ export default function Dashboard() {
             </div>
           ) : reservasFiltradas.length > 0 ? (
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              {reservasFiltradas.slice(0, 9).map((reserva) => (
-                <div key={reserva._id} className="rounded-xl border border-gray-800/60 bg-[#0b0f19]/40 p-4 hover:border-gray-700/60 transition flex flex-col justify-between">
-                  <div>
-                    <div className="flex justify-between items-center mb-3">
-                      <span className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md ${
-                        reserva.status === 'aprovada' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
-                        reserva.status === 'rejeitada' ? 'bg-red-500/10 text-red-400 border border-red-500/20' :
-                        'bg-amber-500/10 text-amber-400 border border-amber-500/20'
-                      }`}>
-                        {reserva.status || 'Pendente'}
-                      </span>
-                    </div>
-                    <h3 className="text-sm font-semibold text-white tracking-tight line-clamp-1">
-                      {reserva.produto?.produto || 'Ativo Hidro-Náutico'}
-                    </h3>
-                    <div className="mt-3 space-y-1 text-xs text-gray-400">
-                      <p className="truncate"><span className="text-gray-500 font-medium">Capitão:</span> {reserva.usuario?.nome || reserva.usuario?.email || reserva.cpf}</p>
-                      <p><span className="text-gray-500 font-medium">Data de Saída:</span> {reserva.data ? new Date(reserva.data).toLocaleDateString('pt-BR') : 'Pendente'}</p>
+              {reservasFiltradas
+                .filter((reserva) => reserva && reserva._id)
+                .slice(0, 9)
+                .map((reserva) => (
+                  <div key={reserva._id} className="rounded-xl border border-gray-800/60 bg-[#0b0f19]/40 p-4 hover:border-gray-700/60 transition flex flex-col justify-between">
+                    <div>
+                      <div className="flex justify-between items-center mb-3">
+                        <span className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md ${
+                          reserva.status === "aprovada" ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" :
+                          reserva.status === "rejeitada" ? "bg-red-500/10 text-red-400 border border-red-500/20" :
+                          "bg-amber-500/10 text-amber-400 border border-amber-500/20"
+                        }`}>
+                          {reserva.status || "Pendente"}
+                        </span>
+                      </div>
+                      <h3 className="text-sm font-semibold text-white tracking-tight line-clamp-1">
+                        {reserva.produto?.produto || "Ativo Hidro-Náutico"}
+                      </h3>
+                      <div className="mt-3 space-y-1 text-xs text-gray-400">
+                        <p className="truncate"><span className="text-gray-500 font-medium">Capitão:</span> {reserva.usuario?.nome || reserva.usuario?.email || reserva.cpf}</p>
+                        <p><span className="text-gray-500 font-medium">Data de Saída:</span> {reserva.data ? new Date(reserva.data).toLocaleDateString("pt-BR") : "Pendente"}</p>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                ))}
             </div>
           ) : (
             <div className="rounded-xl border border-dashed border-gray-800 bg-[#0b0f19]/20 py-12 text-center flex flex-col items-center justify-center">
               <Search size={24} className="mb-2 text-gray-600" />
               <p className="text-xs text-gray-400">Nenhum registro localizado para os critérios aplicados.</p>
-              <button onClick={() => setBusca('')} className="mt-3 text-xs font-bold text-cyan-400 hover:underline">
+              <button onClick={() => setBusca("")} className="mt-3 text-xs font-bold text-cyan-400 hover:underline">
                 Limpar Filtros
               </button>
             </div>
