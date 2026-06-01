@@ -1,47 +1,55 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Users, AlertCircle, Search, X, Trash2, CalendarCheck, Loader2, UserPlus } from 'lucide-react';
-import toast from 'react-hot-toast';
-import Header from '../components/Header';
-import api from '../services/api';
+import { useState, useEffect, useMemo, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
+import { Users, AlertCircle, Search, X, Trash2, CalendarCheck, Loader2, UserPlus } from "lucide-react";
+import toast from "react-hot-toast";
+import Header from "../components/Header";
+import api from "../services/api";
 
 export default function Perfis() {
   const [perfis, setPerfis] = useState([]);
   const [reservas, setReservas] = useState([]);
   const [carregando, setCarregando] = useState(true);
-  const [erro, setErro] = useState('');
-  const [busca, setBusca] = useState('');
+  const [erro, setErro] = useState("");
+  const [busca, setBusca] = useState("");
   const [mostraFormulario, setMostraFormulario] = useState(false);
-  const [nome, setNome] = useState('');
-  const [cpf, setCpf] = useState('');
-  const [email, setEmail] = useState('');
-  const [senha, setSenha] = useState('');
+  const [nome, setNome] = useState("");
+  const [cpf, setCpf] = useState("");
+  const [email, setEmail] = useState("");
+  const [senha, setSenha] = useState("");
   const [enviando, setEnviando] = useState(false);
-  const [excluindoId, setExcluindoId] = useState('');
+  const [excluindoId, setExcluindoId] = useState("");
   const navigate = useNavigate();
 
   const formatarCPF = (valor) => {
     return valor
-      .replace(/\D/g, '')
-      .replace(/(\d{3})(\d)/, '$1.$2')
-      .replace(/(\d{3})(\d)/, '$1.$2')
-      .replace(/(\d{3})(\d{1,2})/, '$1-$2')
-      .replace(/(-\d{2})\d+?$/, '$1');
+      .replace(/\D/g, "")
+      .replace(/(\d{3})(\d)/, "$1.$2")
+      .replace(/(\d{3})(\d)/, "$1.$2")
+      .replace(/(\d{3})(\d{1,2})/, "$1-$2")
+      .replace(/(-\d{2})\d+?$/, "$1");
   };
 
   useEffect(() => {
     const buscarDados = async () => {
       try {
         const [usuariosResposta, reservasResposta] = await Promise.all([
-          api.get('/usuarios/todos'),
-          api.get('/reservas')
+          api.get("/usuarios/todos"),
+          api.get("/reservas")
         ]);
 
-        setPerfis(usuariosResposta.data.reverse());
-        setReservas(reservasResposta.data);
+        const usuariosValidos = Array.isArray(usuariosResposta.data) 
+          ? usuariosResposta.data.filter(u => u && u._id).reverse() 
+          : [];
+          
+        const reservasValidas = Array.isArray(reservasResposta.data) 
+          ? reservasResposta.data.filter(r => r && r._id) 
+          : [];
+
+        setPerfis(usuariosValidos);
+        setReservas(reservasValidas);
       } catch (error) {
-        setErro('Erro ao carregar os dados da página.');
-        toast.error('Não foi possível carregar os perfis e históricos.');
+        setErro("Erro ao carregar os dados da página.");
+        toast.error("Não foi possível carregar os perfis e históricos.");
       } finally {
         setCarregando(false);
       }
@@ -54,76 +62,84 @@ export default function Perfis() {
     e.preventDefault();
 
     if (!cpf || !nome || !email || !senha) {
-      toast.error('Preencha os dados.');
+      toast.error("Preencha os dados.");
       return;
     }
 
     if (cpf.length < 14) {
-      toast.error('CPF incompleto.');
+      toast.error("CPF incompleto.");
       return;
     }
 
     setEnviando(true);
 
     try {
-      await api.post('/usuarios/register', {
+      await api.post("/usuarios/register", {
         nome: nome.trim(),
         cpf,
         email: String(email).toLowerCase().trim(),
         senha
       });
-      toast.success('Perfil criado com sucesso!');
-      setNome('');
-      setCpf('');
-      setEmail('');
-      setSenha('');
+      toast.success("Perfil criado com sucesso!");
+      setNome("");
+      setCpf("");
+      setEmail("");
+      setSenha("");
       setMostraFormulario(false);
 
-      const resposta = await api.get('/usuarios/todos');
-      setPerfis(resposta.data.reverse());
+      const resposta = await api.get("/usuarios/todos");
+      const perfisAtualizados = Array.isArray(resposta.data) 
+        ? resposta.data.filter(u => u && u._id).reverse() 
+        : [];
+      setPerfis(perfisAtualizados);
     } catch (error) {
-      toast.error(error.response?.data?.msg || 'Erro ao criar perfil.');
+      toast.error(error.response?.data?.msg || "Erro ao criar perfil.");
     } finally {
       setEnviando(false);
     }
   };
 
   const handleExcluirUsuario = async (id) => {
-    const confirmar = window.confirm('Tem certeza que deseja excluir este usuário definitivamente?');
+    const confirmar = window.confirm("Tem certeza que deseja excluir este usuário definitivamente?");
     if (!confirmar) return;
 
     setExcluindoId(id);
 
     try {
       await api.delete(`/usuarios/${id}`);
-      toast.success('Usuário excluído com sucesso!');
-      setPerfis(prev => prev.filter(p => p._id !== id));
+      toast.success("Usuário excluído com sucesso!");
+      setPerfis(prev => prev.filter(p => p && p._id !== id));
     } catch (error) {
-      toast.error(error.response?.data?.msg || 'Erro ao excluir perfil.');
+      toast.error(error.response?.data?.msg || "Erro ao excluir perfil.");
     } finally {
-      setExcluindoId('');
+      setExcluindoId("");
     }
   };
 
   const perfisFiltrados = useMemo(() => {
+    if (!Array.isArray(perfis)) return [];
     return perfis.filter((perfil) => {
+      if (!perfil || !perfil._id) return false;
       if (!busca) return true;
       const termo = busca.toLowerCase().trim();
       return (
-        String(perfil.nome || '').toLowerCase().includes(termo) ||
-        String(perfil.cpf || '').toLowerCase().includes(termo) ||
-        String(perfil.email || '').toLowerCase().includes(termo)
+        String(perfil.nome || "").toLowerCase().includes(termo) ||
+        String(perfil.cpf || "").toLowerCase().includes(termo) ||
+        String(perfil.email || "").toLowerCase().includes(termo)
       );
     });
   }, [perfis, busca]);
 
   const contarReservasDoUsuario = useCallback((perfil) => {
+    if (!perfil || !perfil._id || !Array.isArray(reservas)) return 0;
+    
     return reservas.filter(r => {
+      if (!r || !r.usuario) return false;
       const idNaReserva = r.usuario._id || r.usuario.id || r.usuario;
       const bateuId = String(idNaReserva) === String(perfil._id);
 
-      const cpfReservaLimpo = r.cpf ? r.cpf.replace(/\D/g, '') : '';
-      const cpfPerfilLimpo = perfil.cpf ? perfil.cpf.replace(/\D/g, '') : '';
+      const cpfReservaLimpo = r.cpf ? r.cpf.replace(/\D/g, "") : "";
+      const cpfPerfilLimpo = perfil.cpf ? perfil.cpf.replace(/\D/g, "") : "";
       const bateuCpf = cpfReservaLimpo && cpfPerfilLimpo && cpfReservaLimpo === cpfPerfilLimpo;
 
       const emailNaReserva = r.usuario?.email || r.email;
@@ -135,7 +151,7 @@ export default function Perfis() {
 
   return (
     <div className="w-full min-h-screen bg-[#090d16] text-white overflow-x-hidden flex flex-col">
-      <Header mostrarVoltar={true} onVoltar={() => navigate('/')} />
+      <Header mostrarVoltar={true} onVoltar={() => navigate("/")} />
 
       {mostraFormulario && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
@@ -275,22 +291,22 @@ export default function Perfis() {
                       <div className="flex-1">
                         <div className="flex items-center gap-2">
                           <h3 className="text-sm font-semibold text-white tracking-tight">
-                            {perfil.nome || 'Membro do Clube'}
+                            {perfil.nome || "Membro do Clube"}
                           </h3>
-                          {perfil.cargo === 'admin' && (
+                          {perfil.cargo === "admin" && (
                             <span className="bg-gray-800 text-cyan-400 text-[9px] px-2 py-0.5 rounded-md font-bold uppercase tracking-wider border border-gray-700">Admin</span>
                           )}
                         </div>
                         <div className="mt-2 space-y-1 text-xs text-gray-400">
-                          <p><span className="text-gray-500">CPF:</span> {perfil.cpf || 'Não informado'}</p>
-                          <p className="truncate"><span className="text-gray-500">E-mail:</span> {perfil.email || 'Não informado'}</p>
+                          <p><span className="text-gray-500">CPF:</span> {perfil.cpf || "Não informado"}</p>
+                          <p className="truncate"><span className="text-gray-500">E-mail:</span> {perfil.email || "Não informado"}</p>
                         </div>
                       </div>
 
                       <button
                         type="button"
                         onClick={() => handleExcluirUsuario(perfil._id)}
-                        disabled={excluindoId === perfil._id || perfil.cargo === 'admin'}
+                        disabled={excluindoId === perfil._id || perfil.cargo === "admin"}
                         className="inline-flex items-center justify-center p-2 rounded-lg border border-gray-800 text-gray-500 hover:text-red-400 hover:border-red-500/20 transition disabled:opacity-30"
                         title="Banir/Excluir"
                       >
@@ -302,13 +318,13 @@ export default function Perfis() {
                       <div className="flex items-center gap-2 text-xs">
                         <CalendarCheck size={14} className={totalReservas > 0 ? "text-emerald-400" : "text-gray-600"} />
                         <span className={totalReservas > 0 ? "font-semibold text-emerald-400" : "font-medium text-gray-500"}>
-                          {totalReservas} {totalReservas === 1 ? 'Reserva Registrada' : 'Reservas Registradas'}
+                          {totalReservas} {totalReservas === 1 ? "Reserva Registrada" : "Reservas Registradas"}
                         </span>
                       </div>
 
                       {totalReservas > 0 && (
                         <button
-                          onClick={() => navigate('/reservas', { state: { buscarPor: perfil.cpf } })}
+                          onClick={() => navigate("/reservas", { state: { buscarPor: perfil.cpf } })}
                           className="text-xs font-semibold text-cyan-400 hover:text-cyan-300 hover:underline"
                         >
                           Ver Histórico
