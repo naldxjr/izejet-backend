@@ -1,5 +1,6 @@
 const express = require("express");
 const router = express.Router();
+const mongoose = require("mongoose");
 const Catalogo = require("../models/Catalogo");
 const auth = require("../middleware/auth");
 const { adminOnly } = require("../middleware/roleCheck");
@@ -40,6 +41,25 @@ router.get("/", async (req, res) => {
     res.json(itens);
   } catch (err) {
     res.status(500).json({ msg: "Erro no servidor ao buscar catálogo." });
+  }
+});
+
+router.get("/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ msg: "Formato de ID inválido." });
+    }
+
+    const item = await Catalogo.findById(id);
+    if (!item) {
+      return res.status(404).json({ msg: "Ativo hidro-náutico não localizado." });
+    }
+
+    res.json(item);
+  } catch (err) {
+    res.status(500).json({ msg: "Erro no servidor ao buscar detalhes do ativo." });
   }
 });
 
