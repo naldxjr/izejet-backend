@@ -143,9 +143,20 @@ router.post("/login", async (req, res) => {
 router.get("/todos", auth, adminOnly, async (req, res) => {
   try {
     const usuarios = await Usuario.find().select("nome email cpf cargo createdAt updatedAt");
-    res.json(usuarios);
+    const usuariosValidos = (usuarios || []).filter(u => u && u._id);
+    res.json(usuariosValidos);
   } catch (err) {
     res.status(500).json({ msg: "Erro no servidor ao listar usuários." });
+  }
+});
+
+router.get("/perfis", auth, adminOnly, async (req, res) => {
+  try {
+    const usuarios = await Usuario.find().select("nome email cpf cargo createdAt updatedAt");
+    const perfisValidos = (usuarios || []).filter(u => u && u._id);
+    res.json(perfisValidos);
+  } catch (err) {
+    res.status(500).json({ msg: "Erro no servidor ao listar perfis." });
   }
 });
 
