@@ -14,23 +14,28 @@ router.post("/", auth, async (req, res) => {
   try {
     const { cpf, produto, data } = req.body;
 
-    if (!cpf || !produto || !data) {
+    if (!produto || !data) {
       return res.status(400).json({ msg: "Por favor, preencha todos os campos obrigatórios." });
     }
 
-    const cpfNormalizado = String(cpf).replace(/\D/g, "");
-    if (!cpfNormalizado) {
-      return res.status(400).json({ msg: "Por favor, informe um CPF válido." });
+    let perfilEncontrado;
+
+    // 🔥 Busca resiliente: Clientes são validados pelo Token; Admin usa o CPF informado
+    if (req.user.cargo === "admin") {
+      if (!cpf) {
+        return res.status(400).json({ msg: "O CPF do cliente é obrigatório para o administrador." });
+      }
+      const cpfNormalizado = String(cpf).replace(/\D/g, "");
+      if (!cpfNormalizado) {
+        return res.status(400).json({ msg: "Por favor, informe um CPF válido." });
+      }
+      perfilEncontrado = await Perfil.findOne({ cpf: { $regex: new RegExp(cpfNormalizado, "i") } }).select("_id cpf usuario");
+    } else {
+      perfilEncontrado = await Perfil.findOne({ usuario: req.user.id }).select("_id cpf usuario");
     }
 
-    const filtroPerfil = req.user.cargo === "admin" 
-      ? { cpf: { $regex: new RegExp(cpfNormalizado, "i") } }
-      : { usuario: req.user.id, cpf: { $regex: new RegExp(cpfNormalizado, "i") } };
-
-    const perfilEncontrado = await Perfil.findOne(filtroPerfil).select("_id cpf usuario");
-
     if (!perfilEncontrado) {
-      return res.status(404).json({ msg: "Perfil de cliente não correspondente ou não encontrado." });
+      return res.status(404).json({ msg: "Perfil de cliente não correspondente ou não encontrado. Complete seus dados antes de agendar." });
     }
 
     const dataReserva = criarDataSemFuso(data);
@@ -65,13 +70,13 @@ router.post("/", auth, async (req, res) => {
 
     await reserva.save();
 
-    // 🔥 Busca a reserva recém-criada preenchendo (populating) os dados do usuário e do Jet Ski
+    // Busca a reserva recém-criada preenchendo (populating) os dados do usuário e do Jet Ski
     const reservaPopulada = await Reserva.findById(reserva._id)
       .populate("perfil", "nome telefone endereco licencaMotonauta")
       .populate("usuario", "nome email cpf")
       .populate("produto");
 
-    // 🔥 Dispara evento no WebSocket com a reserva COMPLETA (com nomes em vez de IDs)
+    // Dispara evento no WebSocket com a reserva COMPLETA (com nomes em vez de IDs)
     const io = req.app.get("io");
     if (io) io.emit("novaReserva", reservaPopulada);
 
@@ -85,7 +90,6 @@ router.get("/", auth, async (req, res) => {
   try {
     const query = req.user.cargo === "admin" ? {} : { usuario: req.user.id };
     
-    // 🔥 Adicionado "nome" e "cpf" nos populates para garantir a exibição correta
     const reservas = await Reserva.find(query)
       .populate("perfil", "nome telefone endereco licencaMotonauta")
       .populate("usuario", "nome email cpf")
@@ -137,7 +141,7 @@ router.put("/:id", auth, async (req, res) => {
     reserva.produto = produto || reserva.produto;
     await reserva.save();
 
-    // 🔥 Popula antes de emitir a atualização
+    // Popula antes de emitir a atualização
     const reservaPopulada = await Reserva.findById(reserva._id)
       .populate("perfil", "nome telefone endereco licencaMotonauta")
       .populate("usuario", "nome email cpf")
@@ -163,7 +167,6 @@ router.put("/:id/status", auth, async (req, res) => {
       return res.status(400).json({ msg: "Status operacional inválido." });
     }
 
-    // 🔥 Adicionado encadeamento de populate direto no findByIdAndUpdate
     const reserva = await Reserva.findByIdAndUpdate(
       req.params.id, 
       { status }, 
