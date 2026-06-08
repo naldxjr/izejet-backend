@@ -20,22 +20,30 @@ router.post("/", auth, async (req, res) => {
 
     let perfilEncontrado;
 
-    // 🔥 Busca resiliente: Clientes são validados pelo Token; Admin usa o CPF informado
     if (req.user.cargo === "admin") {
-      if (!cpf) {
-        return res.status(400).json({ msg: "O CPF do cliente é obrigatório para o administrador." });
-      }
+      if (!cpf) return res.status(400).json({ msg: "O CPF do cliente é obrigatório para o administrador." });
       const cpfNormalizado = String(cpf).replace(/\D/g, "");
-      if (!cpfNormalizado) {
-        return res.status(400).json({ msg: "Por favor, informe um CPF válido." });
-      }
-      perfilEncontrado = await Perfil.findOne({ cpf: { $regex: new RegExp(cpfNormalizado, "i") } }).select("_id cpf usuario");
+      perfilEncontrado = await Perfil.findOne({ cpf: { $regex: new RegExp(cpfNormalizado, "i") } });
     } else {
-      perfilEncontrado = await Perfil.findOne({ usuario: req.user.id }).select("_id cpf usuario");
+      // 1. Tenta a busca segura pelo ID do Usuário Logado
+      perfilEncontrado = await Perfil.findOne({ usuario: req.user.id });
+
+      // 2. SISTEMA DE AUTO-CURA: Se o perfil for antigo/órfão e não tiver o ID, busca pelo CPF e corrige o banco
+      if (!perfilEncontrado && cpf) {
+        const cpfNormalizado = String(cpf).replace(/\D/g, "");
+        perfilEncontrado = await Perfil.findOne({ cpf: { $regex: new RegExp(cpfNormalizado, "i") } });
+        
+        // Se achou o perfil perdido pelo CPF, "cola" o ID do usuário nele para sempre
+        if (perfilEncontrado) {
+          perfilEncontrado.usuario = req.user.id;
+          await perfilEncontrado.save();
+        }
+      }
     }
 
+    // Se mesmo assim não achou nada, o cliente realmente não preencheu o perfil ainda
     if (!perfilEncontrado) {
-      return res.status(404).json({ msg: "Perfil de cliente não correspondente ou não encontrado. Complete seus dados antes de agendar." });
+      return res.status(404).json({ msg: "Perfil de cliente não correspondente ou não encontrado. Complete seus dados no menu Perfil antes de agendar." });
     }
 
     const dataReserva = criarDataSemFuso(data);
@@ -61,7 +69,7 @@ router.post("/", auth, async (req, res) => {
 
     const reserva = new Reserva({
       perfil: perfilEncontrado._id,
-      usuario: perfilEncontrado.usuario || req.user.id,
+      usuario: req.user.id, // Força o vínculo com o usuário real que está fazendo a ação
       cpf: perfilEncontrado.cpf,
       produto,
       data: dataReserva,
@@ -70,13 +78,11 @@ router.post("/", auth, async (req, res) => {
 
     await reserva.save();
 
-    // Busca a reserva recém-criada preenchendo (populating) os dados do usuário e do Jet Ski
     const reservaPopulada = await Reserva.findById(reserva._id)
       .populate("perfil", "nome telefone endereco licencaMotonauta")
       .populate("usuario", "nome email cpf")
       .populate("produto");
 
-    // Dispara evento no WebSocket com a reserva COMPLETA (com nomes em vez de IDs)
     const io = req.app.get("io");
     if (io) io.emit("novaReserva", reservaPopulada);
 
@@ -141,7 +147,6 @@ router.put("/:id", auth, async (req, res) => {
     reserva.produto = produto || reserva.produto;
     await reserva.save();
 
-    // Popula antes de emitir a atualização
     const reservaPopulada = await Reserva.findById(reserva._id)
       .populate("perfil", "nome telefone endereco licencaMotonauta")
       .populate("usuario", "nome email cpf")
