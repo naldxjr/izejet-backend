@@ -2,7 +2,7 @@ const express = require("express");
 const router = express.Router();
 const Reserva = require("../models/Reserva");
 const Perfil = require("../models/Perfil");
-const Usuario = require("../models/Usuario"); // 🔥 Importação adicionada para cruzamento seguro
+const Usuario = require("../models/Usuario"); 
 const auth = require("../middleware/auth");
 
 const criarDataSemFuso = (dataString) => {
@@ -20,42 +20,30 @@ router.post("/", auth, async (req, res) => {
     }
 
     let perfilEncontrado;
-
-    // Busca o documento oficial do usuário autenticado pelo ID seguro do Token
     const usuarioLogado = await Usuario.findById(req.user.id);
 
     if (req.user.cargo === "admin") {
       if (!cpf) return res.status(400).json({ msg: "O CPF do cliente é obrigatório para o administrador." });
-      
-      // 🔥 GERADOR DE REGEX FLEXÍVEL: Ignora qualquer tipo de pontuação ou máscara no banco
       const cpfLimpo = String(cpf).replace(/\D/g, "");
       const cpfRegex = new RegExp(cpfLimpo.split("").join("\\D*"), "i");
-      
       perfilEncontrado = await Perfil.findOne({ cpf: { $regex: cpfRegex } });
     } else {
-      // 1ª Tentativa: Busca direta e veloz pelo ID do usuário vinculado
       perfilEncontrado = await Perfil.findOne({ usuario: req.user.id });
 
-      // 2ª Tentativa (Auto-Cura): Se não achou pelo ID, busca usando o CPF do cadastro do Usuário
       if (!perfilEncontrado && usuarioLogado && usuarioLogado.cpf) {
         const cpfLimpo = String(usuarioLogado.cpf).replace(/\D/g, "");
         const cpfRegex = new RegExp(cpfLimpo.split("").join("\\D*"), "i");
-        
         perfilEncontrado = await Perfil.findOne({ cpf: { $regex: cpfRegex } });
-        
-        // Se localizou por essa via, repara o banco colando o ID do usuário no Perfil
         if (perfilEncontrado) {
           perfilEncontrado.usuario = req.user.id;
           await perfilEncontrado.save();
         }
       }
       
-      // 3ª Tentativa (Fallback): Busca usando o CPF enviado pelo navegador do cliente
       if (!perfilEncontrado && cpf) {
         const cpfLimpo = String(cpf).replace(/\D/g, "");
         const cpfRegex = new RegExp(cpfLimpo.split("").join("\\D*"), "i");
         perfilEncontrado = await Perfil.findOne({ cpf: { $regex: cpfRegex } });
-        
         if (perfilEncontrado) {
           perfilEncontrado.usuario = req.user.id;
           await perfilEncontrado.save();
@@ -63,7 +51,6 @@ router.post("/", auth, async (req, res) => {
       }
     }
 
-    // Se após as 3 camadas de varredura profunda nada for localizado, o perfil realmente não existe
     if (!perfilEncontrado) {
       return res.status(404).json({ msg: "Perfil de cliente não encontrado. Complete seus dados no menu Perfil antes de agendar." });
     }
@@ -79,10 +66,7 @@ router.post("/", auth, async (req, res) => {
     const reservaExistente = await Reserva.findOne({
       produto,
       status: { $ne: "rejeitada" },
-      data: {
-        $gte: inicioDia,
-        $lte: fimDoDia
-      }
+      data: { $gte: inicioDia, $lte: fimDoDia }
     });
 
     if (reservaExistente) {
@@ -126,6 +110,17 @@ router.get("/", auth, async (req, res) => {
     res.json(reservas);
   } catch (err) {
     res.status(500).json({ msg: "Erro no servidor ao buscar reservas." });
+  }
+});
+
+// 🔥 NOVA ROTA: Retorna APENAS as datas ocupadas para o calendário (Seguro e Privado)
+router.get("/ocupadas", auth, async (req, res) => {
+  try {
+    const reservas = await Reserva.find({ status: { $ne: "rejeitada" } })
+      .select("data produto status"); // Seleciona apenas data e id do ativo, oculta os clientes
+    res.json(reservas);
+  } catch (err) {
+    res.status(500).json({ msg: "Erro ao buscar disponibilidade da frota." });
   }
 });
 
