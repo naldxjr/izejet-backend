@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const Reserva = require("../models/Reserva");
 const Perfil = require("../models/Perfil");
+const Usuario = require("../models/Usuario"); // 🔥 Importação adicionada para cruzamento seguro
 const auth = require("../middleware/auth");
 
 const criarDataSemFuso = (dataString) => {
@@ -20,20 +21,41 @@ router.post("/", auth, async (req, res) => {
 
     let perfilEncontrado;
 
+    // Busca o documento oficial do usuário autenticado pelo ID seguro do Token
+    const usuarioLogado = await Usuario.findById(req.user.id);
+
     if (req.user.cargo === "admin") {
       if (!cpf) return res.status(400).json({ msg: "O CPF do cliente é obrigatório para o administrador." });
-      const cpfNormalizado = String(cpf).replace(/\D/g, "");
-      perfilEncontrado = await Perfil.findOne({ cpf: { $regex: new RegExp(cpfNormalizado, "i") } });
+      
+      // 🔥 GERADOR DE REGEX FLEXÍVEL: Ignora qualquer tipo de pontuação ou máscara no banco
+      const cpfLimpo = String(cpf).replace(/\D/g, "");
+      const cpfRegex = new RegExp(cpfLimpo.split("").join("\\D*"), "i");
+      
+      perfilEncontrado = await Perfil.findOne({ cpf: { $regex: cpfRegex } });
     } else {
-      // 1. Tenta a busca segura pelo ID do Usuário Logado
+      // 1ª Tentativa: Busca direta e veloz pelo ID do usuário vinculado
       perfilEncontrado = await Perfil.findOne({ usuario: req.user.id });
 
-      // 2. SISTEMA DE AUTO-CURA: Se o perfil for antigo/órfão e não tiver o ID, busca pelo CPF e corrige o banco
-      if (!perfilEncontrado && cpf) {
-        const cpfNormalizado = String(cpf).replace(/\D/g, "");
-        perfilEncontrado = await Perfil.findOne({ cpf: { $regex: new RegExp(cpfNormalizado, "i") } });
+      // 2ª Tentativa (Auto-Cura): Se não achou pelo ID, busca usando o CPF do cadastro do Usuário
+      if (!perfilEncontrado && usuarioLogado && usuarioLogado.cpf) {
+        const cpfLimpo = String(usuarioLogado.cpf).replace(/\D/g, "");
+        const cpfRegex = new RegExp(cpfLimpo.split("").join("\\D*"), "i");
         
-        // Se achou o perfil perdido pelo CPF, "cola" o ID do usuário nele para sempre
+        perfilEncontrado = await Perfil.findOne({ cpf: { $regex: cpfRegex } });
+        
+        // Se localizou por essa via, repara o banco colando o ID do usuário no Perfil
+        if (perfilEncontrado) {
+          perfilEncontrado.usuario = req.user.id;
+          await perfilEncontrado.save();
+        }
+      }
+      
+      // 3ª Tentativa (Fallback): Busca usando o CPF enviado pelo navegador do cliente
+      if (!perfilEncontrado && cpf) {
+        const cpfLimpo = String(cpf).replace(/\D/g, "");
+        const cpfRegex = new RegExp(cpfLimpo.split("").join("\\D*"), "i");
+        perfilEncontrado = await Perfil.findOne({ cpf: { $regex: cpfRegex } });
+        
         if (perfilEncontrado) {
           perfilEncontrado.usuario = req.user.id;
           await perfilEncontrado.save();
@@ -41,9 +63,9 @@ router.post("/", auth, async (req, res) => {
       }
     }
 
-    // Se mesmo assim não achou nada, o cliente realmente não preencheu o perfil ainda
+    // Se após as 3 camadas de varredura profunda nada for localizado, o perfil realmente não existe
     if (!perfilEncontrado) {
-      return res.status(404).json({ msg: "Perfil de cliente não correspondente ou não encontrado. Complete seus dados no menu Perfil antes de agendar." });
+      return res.status(404).json({ msg: "Perfil de cliente não encontrado. Complete seus dados no menu Perfil antes de agendar." });
     }
 
     const dataReserva = criarDataSemFuso(data);
@@ -69,7 +91,7 @@ router.post("/", auth, async (req, res) => {
 
     const reserva = new Reserva({
       perfil: perfilEncontrado._id,
-      usuario: req.user.id, // Força o vínculo com o usuário real que está fazendo a ação
+      usuario: req.user.id,
       cpf: perfilEncontrado.cpf,
       produto,
       data: dataReserva,
